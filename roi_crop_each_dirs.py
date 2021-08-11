@@ -1,9 +1,10 @@
 import os
-import shutil as sh
 from glob import glob
 
 import cv2
 import numpy as np
+
+g_raw = None
 
 
 def iou(a, b):
@@ -47,10 +48,10 @@ def draw_rect(img, box, color):
     y2 = int(y2 * img_height)
     cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness=1)
 
-    cv2.imshow('raw', raw)
-    key = cv2.waitKey(0)
-    if key == 27:
-        exit(0)
+    # cv2.imshow('raw', g_raw)
+    # key = cv2.waitKey(0)
+    # if key == 27:
+    #     exit(0)
 
 
 def convert_to_origin_box(roi_box, roi):
@@ -66,19 +67,9 @@ def convert_to_origin_box(roi_box, roi):
     return [cx, cy, w, h]
 
 
-def is_iou_over(origin_box, roi_box, roi, iou_threshold):
-    origin_converted_roi_box = convert_to_origin_box(roi_box, roi)
-
+def is_iou_over(origin_box, origin_converted_roi_box, iou_threshold):
     origin_box = to_x1_y1_x2_y2(origin_box)
     origin_converted_roi_box = to_x1_y1_x2_y2(origin_converted_roi_box)
-
-    # test start
-    global raw
-    draw_rect(raw, roi, (255, 0, 0))
-    draw_rect(raw, origin_converted_roi_box, (0, 255, 0))
-    draw_rect(raw, origin_box, (0, 0, 255))
-    # test end
-
     return iou(origin_box, origin_converted_roi_box) > iou_threshold
 
 
@@ -95,31 +86,9 @@ def convert_to_roi_box(origin_box, roi):
     return [cx, cy, w, h]
 
 
-raw = None
-
-
-def roi_crop_with_label_convert(path, roi, index):
-    global raw
-    roi_x1, roi_y1, roi_x2, roi_y2 = roi
-
-    label_path = f'{path[:-4]}.txt'
-    if not os.path.exists(label_path):
-        print(f'label not exist : {label_path}')
-        return
-
-    new_path = f'{path[:-4]}_roi_cropped_{index}.jpg'
-    new_label_path = f'{label_path[:-4]}_roi_cropped_{index}.txt'
-
-    sh.copy(path, new_path)
-    sh.copy(label_path, new_label_path)
-
-    path = new_path
-    label_path = new_label_path
-
-    img = cv2.imread(path, cv2.IMREAD_COLOR)
-    raw = img.copy()
+def crop_roi_img(img, roi):
     raw_height, raw_width = img.shape[0], img.shape[1]
-
+    roi_x1, roi_y1, roi_x2, roi_y2 = roi
     roi_x1_s32 = int(roi_x1 * raw_width)
     roi_x2_s32 = int(roi_x2 * raw_width)
     roi_y1_s32 = int(roi_y1 * raw_height)
@@ -127,33 +96,54 @@ def roi_crop_with_label_convert(path, roi, index):
 
     img = img[roi_y1_s32:roi_y2_s32, roi_x1_s32:roi_x2_s32]
     if img.shape[0] == 0 or img.shape[1] == 0:
+        return None
+    return img
+
+
+def roi_crop_with_label_convert(path, roi, index):
+    global g_raw
+    label_path = f'{path[:-4]}.txt'
+    if not os.path.exists(label_path):
+        print(f'label not exist : {label_path}')
+        return
+
+    img = cv2.imread(path, cv2.IMREAD_COLOR)
+    g_raw = img.copy()
+
+    roi_img = crop_roi_img(img, roi)
+    if roi_img is None:
         return
 
     with open(label_path, 'rt') as f:
         lines = f.readlines()
 
-    new_label_content = ''
+    roi_label_content = ''
     for line in lines:
         class_index, cx, cy, w, h = list(map(float, line.replace('\n', '').split()))
         class_index = int(class_index)
         origin_box = [cx, cy, w, h]
 
-        in_roi_box = convert_to_roi_box(origin_box, roi)
-        in_roi_box = to_x1_y1_x2_y2(in_roi_box)
-        in_roi_box = np.clip(np.array(in_roi_box), 0.0, 1.0)
-        in_roi_box = to_cx_cy_w_h(in_roi_box)
-        cx, cy, w, h = in_roi_box
+        roi_box = convert_to_roi_box(origin_box, roi)
+        roi_box = to_x1_y1_x2_y2(roi_box)
+        roi_box = np.clip(np.array(roi_box), 0.0, 1.0)
+        roi_box = to_cx_cy_w_h(roi_box)
+        cx, cy, w, h = roi_box
         if w < 0.001 or h < 0.001:
             continue
 
-        if not is_iou_over(origin_box, in_roi_box, roi, 0.5):
-            pass
-            # continue
+        origin_converted_roi_box = convert_to_origin_box(roi_box, roi)
+        if not is_iou_over(origin_box, origin_converted_roi_box, 0.5):
+            continue
 
-        new_label_content += f'{class_index} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}\n'
-    # cv2.imwrite(path, img)
-    # with open(label_path, 'wt') as f:
-    #     f.writelines(new_label_content)
+        roi_label_content += f'{class_index} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}\n'
+
+    roi_img_path = f'{path[:-4]}_roi_cropped_{index}.jpg'
+    roi_label_path = f'{label_path[:-4]}_roi_cropped_{index}.txt'
+    cv2.imwrite(roi_img_path, roi_img)
+    with open(roi_label_path, 'wt') as f:
+        f.writelines(roi_label_content)
+
+    print(f'save success ===> {roi_img_path}')
 
 
 # split roi big : 2/3, small : 1/3
@@ -182,7 +172,6 @@ def main():
         if not os.path.isdir(cur_dir_path):
             continue
 
-        dir_name = cur_dir_path.replace('\\', '/').split('/')[-1]
         rois = get_rois(cur_dir_path)
         for img_path in glob(rf'{cur_dir_path}/*.jpg'):
             for i, cur_roi in enumerate(rois):
