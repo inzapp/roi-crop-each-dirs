@@ -1,9 +1,7 @@
 import os
-import sys
 from glob import glob
 
 import cv2
-import numpy as np
 
 g_win_name = 'ROI setter v1.0 by Inzapp'
 g_ratio_width = 576
