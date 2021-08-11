@@ -118,6 +118,18 @@ def get_label_path(file_path):
     return label_path
 
 
+def resize_with_ratio(img):
+    size = 1024
+    height, width = img.shape[0], img.shape[1]
+    if height < size and width < size:
+        return img
+
+    bigger = max(height, width)
+    weight = size / float(bigger)
+    img = cv2.resize(img, (0, 0), fx=weight, fy=weight)
+    return img
+
+
 img_paths = get_img_paths()
 if len(img_paths) == 0:
     print('No image files in path.')
@@ -129,6 +141,7 @@ while True:
     print(g_file_path)
     g_label_path = get_label_path(g_file_path)
     g_raw = cv2.imread(g_file_path, cv2.IMREAD_COLOR)
+    g_raw = resize_with_ratio(g_raw)
     g_raw_copy = g_raw.copy()
     g_height, g_width = g_raw.shape[0], g_raw.shape[1]
     g_boxes = load_saved_boxes_if_exist(g_label_path)
