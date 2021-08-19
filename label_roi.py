@@ -53,8 +53,8 @@ def mouse_callback(event, cur_x, cur_y, flag, _):
             draw_boxes(raw_copy)
             g_x1 = cur_x
             g_y1 = g_boxes[-1][1]  # last box start y
-            g_x2 = g_x1 + 576
-            g_y2 = g_y1 + 192
+            g_x2 = g_x1 + 480  # to 576
+            g_y2 = g_y1 + 96  # to 192
             cv2.rectangle(raw_copy, (g_x1, g_y1), (g_x2, g_y2), g_box_color, g_thickness)
             cv2.imshow(g_win_name, raw_copy)
         else:

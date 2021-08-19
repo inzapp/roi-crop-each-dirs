@@ -146,7 +146,33 @@ def roi_crop_with_label_convert(path, roi, index):
     print(f'save success ===> {roi_img_path}')
 
 
-# split roi big : 2/3, small : 1/3
+def test(dir_path, big_roi, small_roi):
+    big_x1, big_y1, big_x2, big_y2 = big_roi
+    small_x1, small_y1, small_x2, small_y2 = small_roi
+    for path in glob(f'{dir_path}/*.jpg'):
+        img = cv2.imread(path, cv2.IMREAD_COLOR)
+        height, width = img.shape[0], img.shape[1]
+
+        b_x1 = int(big_x1 * width)
+        b_y1 = int(big_y1 * height)
+        b_x2 = int(big_x2 * width)
+        b_y2 = int(big_y2 * height)
+
+        s_x1 = int(small_x1 * width)
+        s_y1 = int(small_y1 * height)
+        s_x2 = int(small_x2 * width)
+        s_y2 = int(small_y2 * height)
+
+        cv2.rectangle(img, (b_x1, b_y1), (b_x2, b_y2), (0, 0, 255), thickness=2)
+        cv2.rectangle(img, (s_x1, s_y1), (s_x2, s_y2), (0, 255, 0), thickness=2)
+
+        cv2.imshow('img', img)
+        key = cv2.waitKey(0)
+        if key == 27:
+            exit(0)
+
+
+# [[roi], [small_roi]] => split big roi to below small roi
 def get_rois(dir_path):
     roi_file_path = f'{dir_path}/roi.txt'
     if not (os.path.exists(roi_file_path) and os.path.isfile(roi_file_path)):
@@ -155,27 +181,29 @@ def get_rois(dir_path):
     with open(roi_file_path, 'rt') as f:
         lines = f.readlines()
 
-    x1, y1, x2, y2 = list(map(float, lines[0].replace('\n', '').split()))
+    roi_x1, roi_y1, roi_x2, roi_y2 = list(map(float, lines[0].replace('\n', '').split()))
+    small_x1, small_y1, small_x2, small_y2 = list(map(float, lines[1].replace('\n', '').split()))
 
-    height = y2 - y1
-    big_y1 = y1 + height * 0.2891
-    small_y2 = y1 + height * 0.2891
+    big_x1 = roi_x1
+    big_y1 = roi_y1 + (small_y2 - small_y1)  # 16 pixel offset
+    big_x2 = roi_x2
+    big_y2 = roi_y2
+
+    test(dir_path, [big_x1, big_y1, big_x2, big_y2], [small_x1, small_y1, small_x2, small_y2])
 
     rois = []
-    rois.append([x1, big_y1, x2, y2])
-    rois.append([x1, y1, x2, small_y2])
+    rois.append([big_x1, big_y1, big_x2, big_y2])
+    rois.append([small_x1, small_y1, small_x2, small_y2])
     return rois
 
 
 def main():
     for cur_dir_path in glob('*'):
-        if not os.path.isdir(cur_dir_path):
-            continue
-
-        rois = get_rois(cur_dir_path)
-        for img_path in glob(rf'{cur_dir_path}/*.jpg'):
-            for i, cur_roi in enumerate(rois):
-                roi_crop_with_label_convert(img_path, cur_roi, i)
+        if os.path.isdir(cur_dir_path):
+            rois = get_rois(cur_dir_path)
+            for img_path in glob(rf'{cur_dir_path}/*.jpg'):
+                for i, cur_roi in enumerate(rois):
+                    roi_crop_with_label_convert(img_path, cur_roi, i)
 
 
 if __name__ == '__main__':
