@@ -39,19 +39,19 @@ def to_cx_cy_w_h(box):
     return [cx, cy, w, h]
 
 
-def draw_rect(img, box, color):
+def multiply_width_height(box, width, height):
     x1, y1, x2, y2 = box
-    img_height, img_width = img.shape[0], img.shape[1]
-    x1 = int(x1 * img_width)
-    x2 = int(x2 * img_width)
-    y1 = int(y1 * img_height)
-    y2 = int(y2 * img_height)
-    cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness=1)
+    x1 = int(x1 * width)
+    x2 = int(x2 * width)
+    y1 = int(y1 * height)
+    y2 = int(y2 * height)
+    return [x1, y1, x2, y2]
 
-    # cv2.imshow('raw', g_raw)
-    # key = cv2.waitKey(0)
-    # if key == 27:
-    #     exit(0)
+
+def draw_rect(img, box, color):
+    img_height, img_width = img.shape[0], img.shape[1]
+    x1, y1, x2, y2 = multiply_width_height(box, img_width, img_height)
+    cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness=1)
 
 
 def convert_to_origin_box(roi_box, roi):
@@ -100,6 +100,15 @@ def crop_roi_img(img, roi):
     return img
 
 
+def remove_object_in_image(img, box):
+    height, width = img.shape[0], img.shape[1]
+    box = to_x1_y1_x2_y2(box)
+    box = multiply_width_height(box, width, height)
+    x1, y1, x2, y2 = box
+    img = cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 0), thickness=-1)
+    return img
+
+
 def roi_crop_with_label_convert(path, roi, index):
     global g_raw
     label_path = f'{path[:-4]}.txt'
@@ -133,6 +142,7 @@ def roi_crop_with_label_convert(path, roi, index):
 
         origin_converted_roi_box = convert_to_origin_box(roi_box, roi)
         if not is_iou_over(origin_box, origin_converted_roi_box, 0.5):
+            roi_img = remove_object_in_image(roi_img, roi_box)
             continue
 
         roi_label_content += f'{class_index} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}\n'
@@ -185,11 +195,11 @@ def get_rois(dir_path):
     small_x1, small_y1, small_x2, small_y2 = list(map(float, lines[1].replace('\n', '').split()))
 
     big_x1 = roi_x1
-    big_y1 = roi_y1 + (small_y2 - small_y1)  # 16 pixel offset
+    big_y1 = roi_y1 + (small_y2 - small_y1)
     big_x2 = roi_x2
     big_y2 = roi_y2
 
-    test(dir_path, [big_x1, big_y1, big_x2, big_y2], [small_x1, small_y1, small_x2, small_y2])
+    # test(dir_path, [big_x1, big_y1, big_x2, big_y2], [small_x1, small_y1, small_x2, small_y2])
 
     rois = []
     rois.append([big_x1, big_y1, big_x2, big_y2])
