@@ -18,38 +18,60 @@ def draw_boxes(img):
         cv2.rectangle(img, (x1, y1), (x2, y2), g_box_color, g_thickness)
 
 
+# def get_force_ratio_y2(x1, y1, x2, y2):
+#     # global g_ratio, g_box_color, g_thickness
+#     # width = x2 - x1
+#     # height = int(width * g_ratio)  # force ratio
+#     # y2 = y1 + height
+#     return y2
+
+
+# force ration between 1 : 1 ~ 16 : 9
 def get_force_ratio_y2(x1, y1, x2, y2):
-    global g_ratio, g_box_color, g_thickness
-    width = x2 - x1
-    height = int(width * g_ratio)  # force ratio
-    y2 = y1 + height
+    # global g_ratio, g_box_color, g_thickness
+    # width = x2 - x1
+    # height = int(width * g_ratio)  # force ratio
+    # y2 = y1 + height
     return y2
 
 
 def mouse_callback(event, cur_x, cur_y, flag, _):
-    global g_win_name, g_raw, g_start_xy, g_boxes, g_box_color, g_thickness
+    global g_win_name, g_raw, g_x1, g_y1, g_x2, g_y2, g_boxes, g_box_color, g_thickness
     raw_copy = g_raw.copy()
 
     # start click
     if event == 1 and flag == 1:
-        g_start_xy = (cur_x, cur_y)
+        g_x1 = cur_x
+        g_y1 = cur_y
 
     # while dragging
     elif event == 0 and flag == 1:
-        x1, y1 = g_start_xy
-        cur_y = get_force_ratio_y2(x1, y1, cur_x, cur_y)  # force ratio
-        draw_boxes(raw_copy)
-        cv2.rectangle(raw_copy, g_start_xy, (cur_x, cur_y), g_box_color, g_thickness)
-        cv2.imshow(g_win_name, raw_copy)
+        g_x2 = cur_x
+        g_y2 = cur_y
+
+        if len(g_boxes) % 2 == 1:
+            draw_boxes(raw_copy)
+            g_x1 = cur_x
+            g_y1 = g_boxes[-1][1]  # last box start y
+            g_x2 = g_x1 + 576
+            g_y2 = g_y1 + 192
+            cv2.rectangle(raw_copy, (g_x1, g_y1), (g_x2, g_y2), g_box_color, g_thickness)
+            cv2.imshow(g_win_name, raw_copy)
+        else:
+            x1, y1 = g_x1, g_y1
+            # cur_y = get_force_ratio_y2(x1, y1, cur_x, cur_y)  # force ratio
+            draw_boxes(raw_copy)
+            cv2.rectangle(raw_copy, (g_x1, g_y1), (g_x2, g_y2), g_box_color, g_thickness)
+            cv2.imshow(g_win_name, raw_copy)
 
     # end click
     elif event == 4 and flag == 0:
-        cur_y = get_force_ratio_y2(g_start_xy[0], g_start_xy[1], cur_x, cur_y)  # force ratio
-        width = cur_x - g_start_xy[0]
-        height = cur_y - g_start_xy[1]
+        # cur_y = get_force_ratio_y2(g_start_x, g_start_y, cur_x, cur_y)  # force ratio
+        width = g_x2 - g_x1
+        height = g_y2 - g_y1
         if width == 0 or height == 0:
             return
-        g_boxes.append([g_start_xy[0], g_start_xy[1], cur_x, cur_y])  # x1, y1, x2, y2
+        g_boxes.append([g_x1, g_y1, g_x2, g_y2])  # x1, y1, x2, y2
         print(g_boxes)
         save()
 
@@ -139,13 +161,13 @@ while True:
     print(g_file_path)
     g_label_path = get_label_path(g_file_path)
     g_raw = cv2.imread(g_file_path, cv2.IMREAD_COLOR)
-    g_raw = resize_with_ratio(g_raw)
+    # g_raw = resize_with_ratio(g_raw)
     g_raw_copy = g_raw.copy()
     g_height, g_width = g_raw.shape[0], g_raw.shape[1]
     g_boxes = load_saved_boxes_if_exist(g_label_path)
     if len(g_boxes) > 0:
         draw_boxes(g_raw_copy)
-    g_start_xy = [0, 0]
+    g_x1, g_y1, g_x2, g_y2 = 0, 0, 0, 0
     cv2.namedWindow(g_win_name)
     cv2.imshow(g_win_name, g_raw_copy)
     cv2.setMouseCallback(g_win_name, mouse_callback)
