@@ -182,7 +182,7 @@ def test(dir_path, big_roi, small_roi):
             exit(0)
 
 
-# [[roi], [small_roi]] => split big roi to below small roi
+# [[big], [small]]
 def get_rois(dir_path):
     roi_file_path = f'{dir_path}/roi.txt'
     if not (os.path.exists(roi_file_path) and os.path.isfile(roi_file_path)):
@@ -191,13 +191,13 @@ def get_rois(dir_path):
     with open(roi_file_path, 'rt') as f:
         lines = f.readlines()
 
-    roi_x1, roi_y1, roi_x2, roi_y2 = list(map(float, lines[0].replace('\n', '').split()))
+    big_x1, big_y1, big_x2, big_y2 = list(map(float, lines[0].replace('\n', '').split()))
     small_x1, small_y1, small_x2, small_y2 = list(map(float, lines[1].replace('\n', '').split()))
 
-    big_x1 = roi_x1
-    big_y1 = roi_y1 + (small_y2 - small_y1)
-    big_x2 = roi_x2
-    big_y2 = roi_y2
+    # big_x1 = big_x1
+    # big_y1 = big_y1 + (small_y2 - small_y1)
+    # big_x2 = big_x2
+    # big_y2 = big_y2
 
     # test(dir_path, [big_x1, big_y1, big_x2, big_y2], [small_x1, small_y1, small_x2, small_y2])
 
